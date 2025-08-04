@@ -461,26 +461,37 @@
 
             showLoading();
             
-            // Construct the proxy request URL
-            const proxyRequestUrl = `${PROXY_API_ENDPOINT}?url=${encodeURIComponent(url)}`;
-            
-            console.log('Opening URL in new tab through proxy:', url);
-            console.log('Proxy request URL:', proxyRequestUrl);
-            
-            // Open in new tab instead of iframe
-            const newWindow = window.open(proxyRequestUrl, '_blank');
-            
-            if (newWindow) {
-                hideAllMessages();
-                showMessage('success', `Opening ${url} in new tab through secure proxy...`);
+            try {
+                // Convert to path-embedded format following CGIProxy pattern
+                const urlObj = new URL(url);
+                const protocol = urlObj.protocol.slice(0, -1); // Remove the ':'
+                const host = urlObj.host;
+                const pathname = urlObj.pathname.slice(1); // Remove leading '/'
+                const search = urlObj.search;
                 
-                // Clear the input after successful launch
-                setTimeout(() => {
-                    urlInput.value = '';
+                // Construct path-embedded proxy URL: /api/browse/https/domain.com/path?query
+                const pathProxyUrl = `/api/browse/${protocol}/${host}${pathname ? '/' + pathname : ''}${search}`;
+                
+                console.log('Converting URL to path-embedded format:', url, '->', pathProxyUrl);
+                
+                // Open in new tab
+                const newWindow = window.open(pathProxyUrl, '_blank');
+                
+                if (newWindow) {
                     hideAllMessages();
-                }, 2000);
-            } else {
-                showMessage('error', 'Popup blocked! Please allow popups for this site and try again.');
+                    showMessage('success', `Opening ${url} via path-embedded proxy...`);
+                    
+                    // Clear the input after successful launch
+                    setTimeout(() => {
+                        urlInput.value = '';
+                        hideAllMessages();
+                    }, 2000);
+                } else {
+                    showMessage('error', 'Popup blocked! Please allow popups for this site and try again.');
+                }
+            } catch (error) {
+                console.error('Error creating path-embedded URL:', error);
+                showMessage('error', 'Error processing URL. Please try again.');
             }
         }
 
