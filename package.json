@@ -5,7 +5,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'Build completed'",
+    "build": "mkdir public 2>nul & copy index.html public\\index.html",
     "deploy": "vercel --prod"
   },
   "keywords": ["proxy", "vercel", "serverless", "web-proxy"],
