@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Web Proxy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+        }
+
+        .proxy-interface {
+            padding: 30px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .url-input-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        #urlInput {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #urlInput:focus {
+            border-color: #667eea;
+        }
+
+        #goButton {
+            padding: 15px 30px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #goButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #goButton:active {
+            transform: translateY(0);
+        }
+
+        .proxy-frame-container {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 600px;
+        }
+
+        #contentFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            flex: 1;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            display: none;
+            background: #ffe6e6;
+            color: #d63031;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #d63031;
+        }
+
+        .success-message {
+            display: none;
+            background: #e6f7e6;
+            color: #00b894;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #00b894;
+        }
+
+        .quick-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .quick-link {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 8px 15px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .quick-link:hover {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .input-group {
+                flex-direction: column;
+            }
+
+            .quick-links {
+                justify-content: center;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .proxy-interface {
+                padding: 20px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔒 Secure Web Proxy</h1>
+        <p>Access blocked websites securely through our encrypted proxy service</p>
+    </div>
+
+    <div class="proxy-interface">
+        <div class="url-input-section">
+            <div class="input-group">
+                <input type="text" id="urlInput" placeholder="Enter URL (e.g., https://example.com or just example.com)" 
+                       autocomplete="url" spellcheck="false">
+                <button id="goButton">🚀 Go</button>
+            </div>
+            
+            <div class="quick-links">
+                <button class="quick-link" onclick="loadQuickSite('https://www.google.com')">Google</button>
+                <button class="quick-link" onclick="loadQuickSite('https://www.youtube.com')">YouTube</button>
+                <button class="quick-link" onclick="loadQuickSite('https://www.reddit.com')">Reddit</button>
+                <button class="quick-link" onclick="loadQuickSite('https://www.twitter.com')">Twitter</button>
+                <button class="quick-link" onclick="loadQuickSite('https://www.facebook.com')">Facebook</button>
+                <button class="quick-link" onclick="loadQuickSite('https://www.instagram.com')">Instagram</button>
+            </div>
+
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p>Loading content through secure proxy...</p>
+            </div>
+
+            <div id="errorMessage" class="error-message"></div>
+            <div id="successMessage" class="success-message"></div>
+        </div>
+
+        <div class="proxy-frame-container">
+            <iframe id="contentFrame" title="Proxied Content" 
+                    sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-top-navigation">
+                <p>Your browser doesn't support iframes. Please try a different browser.</p>
+            </iframe>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>⚠️ Use responsibly and in accordance with your organization's policies</p>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const goButton = document.getElementById('goButton');
+        const contentFrame = document.getElementById('contentFrame');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        
+        // The proxy API endpoint (relative path to our Vercel serverless function)
+        const PROXY_API_ENDPOINT = '/api/proxy';
+
+        function showMessage(type, message) {
+            hideAllMessages();
+            const element = type === 'error' ? errorMessage : successMessage;
+            element.textContent = message;
+            element.style.display = 'block';
+            
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function hideAllMessages() {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            loadingIndicator.style.display = 'none';
+        }
+
+        function showLoading() {
+            hideAllMessages();
+            loadingIndicator.style.display = 'block';
+        }
+
+        function normalizeUrl(url) {
+            url = url.trim();
+            if (!url) return '';
+            
+            // Add protocol if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            
+            return url;
+        }
+
+        function validateUrl(url) {
+            try {
+                new URL(url);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        function loadUrl(targetUrl = null) {
+            const url = targetUrl || normalizeUrl(urlInput.value);
+            
+            if (!url) {
+                showMessage('error', 'Please enter a valid URL.');
+                return;
+            }
+
+            if (!validateUrl(url)) {
+                showMessage('error', 'Invalid URL format. Please check and try again.');
+                return;
+            }
+
+            // Update input field with normalized URL
+            if (!targetUrl) {
+                urlInput.value = url;
+            }
+
+            showLoading();
+            
+            // Construct the proxy request URL
+            const proxyRequestUrl = `${PROXY_API_ENDPOINT}?url=${encodeURIComponent(url)}`;
+            
+            console.log('Loading URL through proxy:', url);
+            console.log('Proxy request URL:', proxyRequestUrl);
+            
+            // Set iframe source to trigger the proxy request
+            contentFrame.src = proxyRequestUrl;
+            
+            // Handle iframe load events
+            contentFrame.onload = function() {
+                hideAllMessages();
+                showMessage('success', `Successfully loaded: ${url}`);
+            };
+            
+            contentFrame.onerror = function() {
+                showMessage('error', 'Failed to load the website. The site might be down or incompatible.');
+            };
+            
+            // Timeout handling
+            setTimeout(() => {
+                if (loadingIndicator.style.display === 'block') {
+                    hideAllMessages();
+                    showMessage('error', 'Request timed out. The website might be slow or unavailable.');
+                }
+            }, 30000); // 30 second timeout
+        }
+
+        function loadQuickSite(url) {
+            urlInput.value = url;
+            loadUrl(url);
+        }
+
+        // Event listeners
+        goButton.addEventListener('click', () => loadUrl());
+        
+        urlInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                loadUrl();
+            }
+        });
+
+        // Focus on input when page loads
+        window.addEventListener('load', () => {
+            urlInput.focus();
+        });
+
+        // Handle iframe security and error cases
+        window.addEventListener('message', (event) => {
+            // Handle messages from iframe if needed
+            console.log('Received message from iframe:', event);
+        });
+    </script>
+</body>
+</html>

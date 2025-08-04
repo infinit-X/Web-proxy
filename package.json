@@ -1,0 +1,20 @@
+{
+  "name": "vercel-web-proxy",
+  "version": "1.0.0",
+  "description": "A web proxy application deployed on Vercel using serverless functions",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build completed'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": ["proxy", "vercel", "serverless", "web-proxy"],
+  "author": "dulanjanau",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  }
+}
