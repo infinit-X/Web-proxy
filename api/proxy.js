@@ -271,6 +271,26 @@ module.exports = async (req, res) => {
 function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
   const baseUrlObj = new URL(baseUrl);
   
+  // CRITICAL FIX: Inject base tag to set document base URL to our proxy
+  // Remove existing base tags to avoid conflicts
+  html = html.replace(/<base[^>]*>/gi, '');
+  
+  // Create proxy base URL that all relative URLs will use
+  const proxyBaseUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(baseUrlObj.origin)}/`;
+  const baseTag = `<base href="${proxyBaseUrl}" target="_blank">`;
+  
+  // Inject our proxy base tag right after <head>
+  if (html.includes('<head>')) {
+    html = html.replace('<head>', `<head>\n  ${baseTag}`);
+  } else if (html.includes('<HEAD>')) {
+    html = html.replace('<HEAD>', `<HEAD>\n  ${baseTag}`);
+  } else {
+    // Fallback: inject at the beginning of the document
+    html = `${baseTag}\n${html}`;
+  }
+  
+  console.log(`[PROXY] Injected base tag: ${baseTag}`);
+  
   // Rewrite different types of URLs with more comprehensive patterns
   html = html.replace(/href\s*=\s*["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
@@ -381,9 +401,38 @@ function generateProxyScript(baseUrl, proxyOrigin) {
         const BASE_URL = '${baseUrl}';
         const PROXY_ENDPOINT = '/api/proxy';
         
-        console.log('[PROXY] Initializing proxy persistence script');
+        console.log('[PROXY] Initializing enhanced proxy persistence script');
         console.log('[PROXY] Base URL:', BASE_URL);
         console.log('[PROXY] Proxy Origin:', PROXY_ORIGIN);
+        
+        // Register service worker for complete request interception
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+              console.log('[PROXY] Service Worker registered successfully:', registration.scope);
+              
+              // If there's a waiting service worker, activate it immediately
+              if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+              }
+              
+              // Listen for the waiting state change
+              registration.addEventListener('updatefound', function() {
+                const newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', function() {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      // New service worker available, activate it
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                  });
+                }
+              });
+            })
+            .catch(function(error) {
+              console.log('[PROXY] Service Worker registration failed:', error);
+            });
+        }
         
         function getCurrentPageUrl() {
           try {
