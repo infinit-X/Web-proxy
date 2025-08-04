@@ -34,14 +34,33 @@ module.exports = async (req, res) => {
     console.error('[PROXY] Request URL:', req.url);
     
     // Check if this looks like a form submission that got misdirected
-    if (req.query.q && req.query.btnK) {
-      // This looks like a Google search form submission
-      const searchUrl = 'https://www.google.com/search?' + new URLSearchParams(req.query).toString();
-      console.log('[PROXY] Detected misdirected Google search, redirecting to:', searchUrl);
-      
-      // Redirect to the proper proxy URL for this search
-      const properProxyUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(searchUrl)}`;
-      return res.redirect(302, properProxyUrl);
+    if (req.query.q || req.query.t) {
+      // This looks like a search form submission (Google: q, DuckDuckGo: q, Bing: q, other: t)
+      const referer = req.headers.referer;
+      if (referer && referer.includes('/api/proxy?url=')) {
+        try {
+          const originalUrl = decodeURIComponent(referer.split('url=')[1].split('&')[0]);
+          const originalUrlObj = new URL(originalUrl);
+          
+          let searchUrl;
+          if (originalUrl.includes('google.com')) {
+            searchUrl = 'https://www.google.com/search?' + new URLSearchParams(req.query).toString();
+          } else if (originalUrl.includes('duckduckgo.com')) {
+            searchUrl = 'https://duckduckgo.com/?' + new URLSearchParams(req.query).toString();
+          } else if (originalUrl.includes('bing.com')) {
+            searchUrl = 'https://www.bing.com/search?' + new URLSearchParams(req.query).toString();
+          } else {
+            // Generic approach - use the same origin
+            searchUrl = originalUrlObj.origin + '/search?' + new URLSearchParams(req.query).toString();
+          }
+          
+          console.log('[PROXY] Detected search form submission, redirecting to:', searchUrl);
+          const properProxyUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(searchUrl)}`;
+          return res.redirect(302, properProxyUrl);
+        } catch (error) {
+          console.error('[PROXY] Error reconstructing search URL:', error);
+        }
+      }
     }
     
     // Check for other common form patterns
@@ -275,9 +294,9 @@ function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
   // Remove existing base tags to avoid conflicts
   html = html.replace(/<base[^>]*>/gi, '');
   
-  // Create proxy base URL that all relative URLs will use
-  const proxyBaseUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(baseUrlObj.origin)}/`;
-  const baseTag = `<base href="${proxyBaseUrl}" target="_blank">`;
+  // Create proxy base URL that all relative URLs will use - this is key for form submissions
+  const currentProxyUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(baseUrl)}`;
+  const baseTag = `<base href="${currentProxyUrl}" target="_blank">`;
   
   // Inject our proxy base tag right after <head>
   if (html.includes('<head>')) {
@@ -292,22 +311,22 @@ function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
   console.log(`[PROXY] Injected base tag: ${baseTag}`);
   
   // Rewrite different types of URLs with more comprehensive patterns
-  html = html.replace(/href\s*=\s*["']([^"']+)["']/gi, (match, url) => {
+  rewrittenHtml = rewrittenHtml.replace(/href\s*=\s*["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `href="${rewrittenUrl}"`;
   });
   
-  html = html.replace(/src\s*=\s*["']([^"']+)["']/gi, (match, url) => {
+  rewrittenHtml = rewrittenHtml.replace(/src\s*=\s*["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `src="${rewrittenUrl}"`;
   });
   
   // Enhanced form action rewriting with better handling for empty/relative actions
-  html = html.replace(/(<form[^>]+)action\s*=\s*["']([^"']*)["']/gi, (match, formStart, action) => {
+  rewrittenHtml = rewrittenHtml.replace(/(<form[^>]*?)(?:\s+action\s*=\s*["']([^"']*)["'])?([^>]*>)/gi, (match, formStart, action, formEnd) => {
     let targetUrl = action;
     
-    // Handle empty or relative form actions
-    if (!targetUrl || targetUrl === '/') {
+    // Handle empty or missing form actions (they submit to current page)
+    if (!targetUrl || targetUrl === '' || targetUrl === '#') {
       targetUrl = baseUrl;
     } else if (targetUrl.startsWith('/')) {
       targetUrl = baseUrlObj.origin + targetUrl;
@@ -315,42 +334,31 @@ function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
       targetUrl = new URL(targetUrl, baseUrl).href;
     }
     
-    // Special handling for Google search forms
-    if (targetUrl.includes('/search') && baseUrl.includes('google.com')) {
-      targetUrl = baseUrlObj.origin + '/search';
-    }
-    
     const rewrittenUrl = rewriteUrl(targetUrl, baseUrl, proxyOrigin);
-    console.log(`[PROXY] Server-side form rewrite: ${action} -> ${targetUrl} -> ${rewrittenUrl}`);
-    return `${formStart}action="${rewrittenUrl}"`;
-  });
-  
-  // Also handle forms without action attribute (they submit to current page)
-  html = html.replace(/(<form(?![^>]*action)[^>]*>)/gi, (match, formTag) => {
-    const rewrittenUrl = rewriteUrl(baseUrl, baseUrl, proxyOrigin);
-    console.log(`[PROXY] Adding action to form without action: ${rewrittenUrl}`);
-    return formTag.replace('>', ` action="${rewrittenUrl}">`);
+    console.log(`[PROXY] Form action rewrite: "${action}" -> "${targetUrl}" -> "${rewrittenUrl}"`);
+    
+    return `${formStart} action="${rewrittenUrl}"${formEnd}`;
   });
   
   // Rewrite CSS @import and url() references
-  html = html.replace(/url\s*\(\s*["']?([^"')]+)["']?\s*\)/gi, (match, url) => {
+  rewrittenHtml = rewrittenHtml.replace(/url\s*\(\s*["']?([^"')]+)["']?\s*\)/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `url("${rewrittenUrl}")`;
   });
   
   // Rewrite @import statements
-  html = html.replace(/@import\s+["']([^"']+)["']/gi, (match, url) => {
+  rewrittenHtml = rewrittenHtml.replace(/@import\s+["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `@import "${rewrittenUrl}"`;
   });
   
   // Rewrite meta refresh URLs
-  html = html.replace(/content\s*=\s*["'][^"']*url\s*=\s*([^"';]+)[^"']*["']/gi, (match, url) => {
+  rewrittenHtml = rewrittenHtml.replace(/content\s*=\s*["'][^"']*url\s*=\s*([^"';]+)[^"']*["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url.trim(), baseUrl, proxyOrigin);
     return match.replace(url, rewrittenUrl);
   });
   
-  return html;
+  return rewrittenHtml;
 }
 
 // Function to rewrite URLs in CSS content
