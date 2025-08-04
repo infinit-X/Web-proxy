@@ -30,11 +30,45 @@ module.exports = async (req, res) => {
   // Validate the URL parameter
   if (!targetUrl) {
     console.error('[PROXY] Missing URL parameter');
+    console.error('[PROXY] Query params:', req.query);
+    console.error('[PROXY] Request URL:', req.url);
+    
+    // Check if this looks like a form submission that got misdirected
+    if (req.query.q && req.query.btnK) {
+      // This looks like a Google search form submission
+      const searchUrl = 'https://www.google.com/search?' + new URLSearchParams(req.query).toString();
+      console.log('[PROXY] Detected misdirected Google search, redirecting to:', searchUrl);
+      
+      // Redirect to the proper proxy URL for this search
+      const properProxyUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(searchUrl)}`;
+      return res.redirect(302, properProxyUrl);
+    }
+    
+    // Check for other common form patterns
+    if (Object.keys(req.query).length > 0) {
+      // Try to determine the intended target from the referer
+      const referer = req.headers.referer;
+      if (referer && referer.includes('/api/proxy?url=')) {
+        try {
+          const originalUrl = decodeURIComponent(referer.split('url=')[1].split('&')[0]);
+          const originalUrlObj = new URL(originalUrl);
+          const targetWithQuery = originalUrlObj.origin + originalUrlObj.pathname + '?' + new URLSearchParams(req.query).toString();
+          
+          console.log('[PROXY] Detected form submission from referer, redirecting to:', targetWithQuery);
+          const properProxyUrl = `${proxyOrigin}/api/proxy?url=${encodeURIComponent(targetWithQuery)}`;
+          return res.redirect(302, properProxyUrl);
+        } catch (error) {
+          console.error('[PROXY] Error parsing referer for form submission:', error);
+        }
+      }
+    }
+    
     return res.status(400).json({
       error: 'Missing URL parameter',
       message: 'Please provide a URL to proxy in the ?url= parameter',
       receivedQuery: req.query,
-      requestUrl: req.url
+      requestUrl: req.url,
+      suggestion: 'This may be a misdirected form submission. Check that form actions are properly rewritten.'
     });
   }
 
@@ -248,9 +282,34 @@ function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
     return `src="${rewrittenUrl}"`;
   });
   
-  html = html.replace(/action\s*=\s*["']([^"']+)["']/gi, (match, url) => {
-    const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
-    return `action="${rewrittenUrl}"`;
+  // Enhanced form action rewriting with better handling for empty/relative actions
+  html = html.replace(/(<form[^>]+)action\s*=\s*["']([^"']*)["']/gi, (match, formStart, action) => {
+    let targetUrl = action;
+    
+    // Handle empty or relative form actions
+    if (!targetUrl || targetUrl === '/') {
+      targetUrl = baseUrl;
+    } else if (targetUrl.startsWith('/')) {
+      targetUrl = baseUrlObj.origin + targetUrl;
+    } else if (!targetUrl.startsWith('http')) {
+      targetUrl = new URL(targetUrl, baseUrl).href;
+    }
+    
+    // Special handling for Google search forms
+    if (targetUrl.includes('/search') && baseUrl.includes('google.com')) {
+      targetUrl = baseUrlObj.origin + '/search';
+    }
+    
+    const rewrittenUrl = rewriteUrl(targetUrl, baseUrl, proxyOrigin);
+    console.log(`[PROXY] Server-side form rewrite: ${action} -> ${targetUrl} -> ${rewrittenUrl}`);
+    return `${formStart}action="${rewrittenUrl}"`;
+  });
+  
+  // Also handle forms without action attribute (they submit to current page)
+  html = html.replace(/(<form(?![^>]*action)[^>]*>)/gi, (match, formTag) => {
+    const rewrittenUrl = rewriteUrl(baseUrl, baseUrl, proxyOrigin);
+    console.log(`[PROXY] Adding action to form without action: ${rewrittenUrl}`);
+    return formTag.replace('>', ` action="${rewrittenUrl}">`);
   });
   
   // Rewrite CSS @import and url() references
@@ -326,6 +385,23 @@ function generateProxyScript(baseUrl, proxyOrigin) {
         console.log('[PROXY] Base URL:', BASE_URL);
         console.log('[PROXY] Proxy Origin:', PROXY_ORIGIN);
         
+        function getCurrentPageUrl() {
+          try {
+            // Extract the original URL from the current proxy URL
+            const currentHref = window.location.href;
+            if (currentHref.includes(PROXY_ENDPOINT + '?url=')) {
+              const urlParam = currentHref.split(PROXY_ENDPOINT + '?url=')[1];
+              if (urlParam) {
+                return decodeURIComponent(urlParam.split('&')[0]);
+              }
+            }
+            return BASE_URL;
+          } catch (error) {
+            console.error('[PROXY] Error getting current page URL:', error);
+            return BASE_URL;
+          }
+        }
+        
         function rewriteProxyUrl(url) {
           try {
             if (!url || typeof url !== 'string') return url;
@@ -359,9 +435,8 @@ function generateProxyScript(baseUrl, proxyOrigin) {
               const baseUrlObj = new URL(BASE_URL);
               absoluteUrl = baseUrlObj.origin + url;
             } else {
-              // Relative URL - resolve against current page URL or base URL
-              const currentUrl = window.location.href.includes(PROXY_ENDPOINT) ? 
-                decodeURIComponent(window.location.href.split('url=')[1] || BASE_URL) : BASE_URL;
+              // Relative URL - resolve against current page URL
+              const currentUrl = getCurrentPageUrl();
               absoluteUrl = new URL(url, currentUrl).href;
             }
             
@@ -375,16 +450,31 @@ function generateProxyScript(baseUrl, proxyOrigin) {
           }
         }
         
-        // Override form submissions
+        // Override form submissions with better handling
         document.addEventListener('submit', function(e) {
           try {
             if (e.target && e.target.tagName === 'FORM') {
               const form = e.target;
-              const action = form.getAttribute('action');
+              const action = form.getAttribute('action') || '';
+              
+              console.log('[PROXY] Form submit intercepted. Original action:', action);
+              
               if (action) {
+                // Check if action is already a proxy URL
+                if (action.includes(PROXY_ENDPOINT)) {
+                  console.log('[PROXY] Form already has proxy action, skipping rewrite');
+                  return;
+                }
+                
                 const newAction = rewriteProxyUrl(action);
                 form.setAttribute('action', newAction);
                 console.log('[PROXY] Form action rewritten:', action, '->', newAction);
+              } else {
+                // Handle forms with no action (submit to current page)
+                const currentPageUrl = getCurrentPageUrl();
+                const newAction = rewriteProxyUrl(currentPageUrl);
+                form.setAttribute('action', newAction);
+                console.log('[PROXY] Form with no action, setting to current page:', newAction);
               }
             }
           } catch (error) {
@@ -540,15 +630,32 @@ function generateProxyScript(baseUrl, proxyOrigin) {
               }
             });
             
-            // Fix forms
-            document.querySelectorAll('form[action]').forEach(function(form) {
+            // Fix forms with better handling
+            document.querySelectorAll('form').forEach(function(form) {
               const action = form.getAttribute('action');
-              if (action && !action.includes(PROXY_ENDPOINT)) {
-                const newAction = rewriteProxyUrl(action);
-                if (newAction !== action) {
-                  form.setAttribute('action', newAction);
-                  console.log('[PROXY] Fixed form action:', action, '->', newAction);
+              if (action) {
+                if (!action.includes(PROXY_ENDPOINT)) {
+                  const newAction = rewriteProxyUrl(action);
+                  if (newAction !== action) {
+                    form.setAttribute('action', newAction);
+                    console.log('[PROXY] Fixed form action:', action, '->', newAction);
+                  }
                 }
+              } else {
+                // Forms with no action submit to current page
+                const currentUrl = getCurrentPageUrl();
+                const newAction = rewriteProxyUrl(currentUrl);
+                form.setAttribute('action', newAction);
+                console.log('[PROXY] Fixed form with no action, set to:', newAction);
+              }
+              
+              // Special handling for Google search forms
+              if (form.querySelector('input[name="q"]') && 
+                  (action === '/search' || action === '' || !action)) {
+                const googleSearchUrl = new URL(getCurrentPageUrl()).origin + '/search';
+                const newAction = rewriteProxyUrl(googleSearchUrl);
+                form.setAttribute('action', newAction);
+                console.log('[PROXY] Fixed Google search form action to:', newAction);
               }
             });
             
@@ -592,13 +699,32 @@ function generateProxyScript(baseUrl, proxyOrigin) {
           console.log('[PROXY DEBUG] Current URL:', window.location.href);
           console.log('[PROXY DEBUG] Base URL:', BASE_URL);
           console.log('[PROXY DEBUG] Proxy Origin:', PROXY_ORIGIN);
-          console.log('[PROXY DEBUG] Links found:', document.querySelectorAll('a[href]').length);
-          console.log('[PROXY DEBUG] Images found:', document.querySelectorAll('img[src]').length);
-          console.log('[PROXY DEBUG] Forms found:', document.querySelectorAll('form').length);
+          console.log('[PROXY DEBUG] Current Page URL:', getCurrentPageUrl());
+          
+          var links = document.querySelectorAll('a[href]');
+          var images = document.querySelectorAll('img[src]');
+          var forms = document.querySelectorAll('form');
+          
+          console.log('[PROXY DEBUG] Links found:', links.length);
+          console.log('[PROXY DEBUG] Images found:', images.length);
+          console.log('[PROXY DEBUG] Forms found:', forms.length);
+          
+          // Analyze forms in detail
+          forms.forEach(function(form, index) {
+            var action = form.getAttribute('action');
+            var method = form.getAttribute('method') || 'GET';
+            var hasSearchInput = form.querySelector('input[name="q"]');
+            console.log('[PROXY DEBUG] Form ' + (index + 1) + ':', {
+              action: action,
+              method: method,
+              isSearchForm: !!hasSearchInput,
+              isProxied: action && action.includes(PROXY_ENDPOINT)
+            });
+          });
           
           // Test URL rewriting
-          const testUrls = ['/test', './test', '../test', 'https://example.com'];
-          testUrls.forEach(url => {
+          var testUrls = ['/test', './test', '../test', 'https://example.com', '/search'];
+          testUrls.forEach(function(url) {
             console.log('[PROXY DEBUG] Test rewrite:', url, '->', rewriteProxyUrl(url));
           });
         };

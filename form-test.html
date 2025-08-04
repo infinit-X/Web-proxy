@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .form-section { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        input[type="text"] { padding: 8px; margin: 5px; width: 200px; }
+        button { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .result { background: #e9ecef; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Form Test Page</h1>
+    
+    <div class="form-section">
+        <h3>Google Search Form Simulation</h3>
+        <form action="/search" method="get">
+            <input type="text" name="q" placeholder="Search query" value="hello world">
+            <input type="hidden" name="sca_esv" value="test123">
+            <input type="hidden" name="source" value="hp">
+            <button type="submit" name="btnK" value="Google Search">Search</button>
+        </form>
+    </div>
+    
+    <div class="form-section">
+        <h3>Form with No Action</h3>
+        <form method="get">
+            <input type="text" name="test" placeholder="Test input" value="no action form">
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+    
+    <div class="form-section">
+        <h3>Absolute URL Form</h3>
+        <form action="https://httpbin.org/get" method="get">
+            <input type="text" name="data" placeholder="Test data" value="absolute url">
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+    
+    <div class="form-section">
+        <h3>Relative URL Form</h3>
+        <form action="./test-endpoint" method="post">
+            <input type="text" name="relative" placeholder="Relative test" value="relative url">
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+    
+    <div class="form-section">
+        <h3>Debug Information</h3>
+        <button onclick="showDebugInfo()">Show Debug Info</button>
+        <div id="debugResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        function showDebugInfo() {
+            const forms = document.querySelectorAll('form');
+            const debugInfo = {
+                totalForms: forms.length,
+                currentUrl: window.location.href,
+                isProxied: window.location.href.includes('/api/proxy'),
+                forms: []
+            };
+            
+            forms.forEach((form, index) => {
+                debugInfo.forms.push({
+                    index: index + 1,
+                    action: form.getAttribute('action'),
+                    method: form.getAttribute('method'),
+                    hasSearchInput: !!form.querySelector('input[name="q"]'),
+                    actionIsProxied: form.getAttribute('action')?.includes('/api/proxy')
+                });
+            });
+            
+            document.getElementById('debugResult').innerHTML = JSON.stringify(debugInfo, null, 2);
+            document.getElementById('debugResult').style.display = 'block';
+            
+            // Also run proxy debug if available
+            if (typeof window.proxyDebug === 'function') {
+                console.log('=== PROXY DEBUG OUTPUT ===');
+                window.proxyDebug();
+            }
+        }
+        
+        // Log form submissions for debugging
+        document.addEventListener('submit', function(e) {
+            console.log('Form submission detected:', {
+                action: e.target.getAttribute('action'),
+                method: e.target.getAttribute('method'),
+                formData: new FormData(e.target)
+            });
+        });
+        
+        console.log('Form test page loaded. Check form actions:');
+        document.querySelectorAll('form').forEach((form, index) => {
+            console.log(`Form ${index + 1} action:`, form.getAttribute('action'));
+        });
+    </script>
+</body>
+</html>
