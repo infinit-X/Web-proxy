@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        input[type="text"] {
+            width: 300px;
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Proxy Test & Debug Page</h1>
+        
+        <div class="test-section">
+            <h3>📊 Debug Information</h3>
+            <button onclick="showDebugInfo()">Show Debug Info</button>
+            <div id="debugInfo" class="result" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔗 URL Rewriting Test</h3>
+            <input type="text" id="testUrl" placeholder="Enter URL to test" value="/search?q=test">
+            <button onclick="testUrlRewriting()">Test URL Rewriting</button>
+            <div id="urlResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📡 Proxy Request Test</h3>
+            <input type="text" id="proxyUrl" placeholder="Enter URL to proxy" value="https://httpbin.org/json">
+            <button onclick="testProxyRequest()">Test Proxy Request</button>
+            <div id="proxyResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔍 Link Detection Test</h3>
+            <p>Test links:</p>
+            <a href="/relative-link">Relative Link</a> |
+            <a href="https://www.google.com">Absolute Link</a> |
+            <a href="javascript:alert('JS Link')">JavaScript Link</a>
+            <br><br>
+            <button onclick="testLinkDetection()">Test Link Detection</button>
+            <div id="linkResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>📝 Form Test</h3>
+            <form action="/test-form" method="post" onsubmit="return testFormSubmit(event)">
+                <input type="text" name="test" placeholder="Test input" value="Hello World">
+                <button type="submit">Submit Form</button>
+            </form>
+            <div id="formResult" class="result" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        function showDebugInfo() {
+            const info = {
+                currentUrl: window.location.href,
+                userAgent: navigator.userAgent,
+                referrer: document.referrer,
+                origin: window.location.origin,
+                host: window.location.host,
+                pathname: window.location.pathname,
+                search: window.location.search,
+                isProxied: window.location.href.includes('/api/proxy'),
+                proxyDebugAvailable: typeof window.proxyDebug === 'function'
+            };
+            
+            document.getElementById('debugInfo').innerHTML = JSON.stringify(info, null, 2);
+            document.getElementById('debugInfo').style.display = 'block';
+            
+            if (window.proxyDebug) {
+                console.log('Running proxy debug...');
+                window.proxyDebug();
+            }
+        }
+        
+        function testUrlRewriting() {
+            const testUrl = document.getElementById('testUrl').value;
+            const result = {
+                originalUrl: testUrl,
+                currentLocation: window.location.href,
+                isProxied: window.location.href.includes('/api/proxy')
+            };
+            
+            if (window.proxyDebug && typeof window.rewriteProxyUrl === 'function') {
+                result.rewrittenUrl = window.rewriteProxyUrl(testUrl);
+            } else {
+                result.note = 'Proxy script not loaded or rewriteProxyUrl function not available';
+            }
+            
+            document.getElementById('urlResult').innerHTML = JSON.stringify(result, null, 2);
+            document.getElementById('urlResult').style.display = 'block';
+        }
+        
+        async function testProxyRequest() {
+            const url = document.getElementById('proxyUrl').value;
+            const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+            
+            try {
+                const response = await fetch(proxyUrl);
+                const result = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    url: response.url
+                };
+                
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        result.data = await response.json();
+                    } else {
+                        result.data = await response.text();
+                        if (result.data.length > 500) {
+                            result.data = result.data.substring(0, 500) + '... (truncated)';
+                        }
+                    }
+                }
+                
+                document.getElementById('proxyResult').innerHTML = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('proxyResult').innerHTML = 'Error: ' + error.message;
+            }
+            
+            document.getElementById('proxyResult').style.display = 'block';
+        }
+        
+        function testLinkDetection() {
+            const links = document.querySelectorAll('a[href]');
+            const result = {
+                totalLinks: links.length,
+                links: Array.from(links).map(link => ({
+                    href: link.getAttribute('href'),
+                    text: link.textContent.trim(),
+                    isProxied: link.href.includes('/api/proxy')
+                }))
+            };
+            
+            document.getElementById('linkResult').innerHTML = JSON.stringify(result, null, 2);
+            document.getElementById('linkResult').style.display = 'block';
+        }
+        
+        function testFormSubmit(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const result = {
+                action: form.getAttribute('action'),
+                method: form.getAttribute('method'),
+                formData: new FormData(form),
+                isProxied: form.action.includes('/api/proxy')
+            };
+            
+            // Convert FormData to object for display
+            result.formDataObj = {};
+            for (let [key, value] of result.formData.entries()) {
+                result.formDataObj[key] = value;
+            }
+            delete result.formData;
+            
+            document.getElementById('formResult').innerHTML = JSON.stringify(result, null, 2);
+            document.getElementById('formResult').style.display = 'block';
+            
+            return false;
+        }
+        
+        // Add some test console output
+        console.log('Proxy Test Page Loaded');
+        console.log('Location:', window.location.href);
+        console.log('Is Proxied:', window.location.href.includes('/api/proxy'));
+    </script>
+</body>
+</html>
