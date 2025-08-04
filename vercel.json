@@ -4,13 +4,10 @@
     "api/proxy.js": {
       "maxDuration": 30
     },
+    "api/browse.js": {
+      "maxDuration": 30
+    },
     "api/encode/[encoded].js": {
-      "maxDuration": 30
-    },
-    "api/browse/[...segments].js": {
-      "maxDuration": 30
-    },
-    "api/proxy-path/[...path].js": {
       "maxDuration": 30
     },
     "api/encode-helper.js": {

@@ -462,24 +462,24 @@
             showLoading();
             
             try {
-                // Convert to path-embedded format following CGIProxy pattern
+                // Convert to browse proxy format: /api/browse?p=https/domain.com/path
                 const urlObj = new URL(url);
                 const protocol = urlObj.protocol.slice(0, -1); // Remove the ':'
                 const host = urlObj.host;
                 const pathname = urlObj.pathname.slice(1); // Remove leading '/'
                 const search = urlObj.search;
                 
-                // Construct path-embedded proxy URL: /api/browse/https/domain.com/path?query
-                const pathProxyUrl = `/api/browse/${protocol}/${host}${pathname ? '/' + pathname : ''}${search}`;
+                // Construct browse proxy URL
+                const browseProxyUrl = `/api/browse?p=${protocol}/${host}${pathname ? '/' + pathname : ''}${search}`;
                 
-                console.log('Converting URL to path-embedded format:', url, '->', pathProxyUrl);
+                console.log('Converting URL to browse proxy format:', url, '->', browseProxyUrl);
                 
                 // Open in new tab
-                const newWindow = window.open(pathProxyUrl, '_blank');
+                const newWindow = window.open(browseProxyUrl, '_blank');
                 
                 if (newWindow) {
                     hideAllMessages();
-                    showMessage('success', `Opening ${url} via path-embedded proxy...`);
+                    showMessage('success', `Opening ${url} via browse proxy...`);
                     
                     // Clear the input after successful launch
                     setTimeout(() => {
@@ -490,7 +490,7 @@
                     showMessage('error', 'Popup blocked! Please allow popups for this site and try again.');
                 }
             } catch (error) {
-                console.error('Error creating path-embedded URL:', error);
+                console.error('Error creating browse proxy URL:', error);
                 showMessage('error', 'Error processing URL. Please try again.');
             }
         }
