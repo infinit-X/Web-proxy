@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProxyProxy Style Web Proxy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        
+        .feature {
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #2980b9;
+        }
+        
+        .input-group {
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        input[type="url"] {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .quick-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .quick-link {
+            padding: 12px 20px;
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            border-radius: 10px;
+            text-decoration: none;
+            color: #333;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .quick-link:hover {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: rgba(102, 126, 234, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .message.success {
+            background: rgba(46, 204, 113, 0.1);
+            border: 2px solid rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+        
+        .message.error {
+            background: rgba(231, 76, 60, 0.1);
+            border: 2px solid rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ProxyProxy Style</h1>
+        <p class="subtitle">Web proxy with permalink address bar and stable URLs</p>
+        
+        <div class="feature">
+            ✨ <strong>New ProxyProxy Pattern:</strong> Stable proxy URLs with visible target address bar
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <div class="input-group">
+            <label for="urlInput">Enter Website URL:</label>
+            <input type="url" id="urlInput" placeholder="https://www.google.com" autofocus>
+        </div>
+        
+        <button onclick="loadProxyProxyUrl()">🌐 Browse with ProxyProxy Style</button>
+        
+        <div class="quick-links">
+            <div class="quick-link" onclick="setUrl('https://www.google.com')">Google</div>
+            <div class="quick-link" onclick="setUrl('https://duckduckgo.com')">DuckDuckGo</div>
+            <div class="quick-link" onclick="setUrl('https://www.bing.com')">Bing</div>
+            <div class="quick-link" onclick="setUrl('https://www.wikipedia.org')">Wikipedia</div>
+            <div class="quick-link" onclick="setUrl('https://www.reddit.com')">Reddit</div>
+            <div class="quick-link" onclick="setUrl('https://news.ycombinator.com')">Hacker News</div>
+        </div>
+    </div>
+
+    <script>
+        function setUrl(url) {
+            document.getElementById('urlInput').value = url;
+            document.getElementById('urlInput').focus();
+        }
+        
+        function showMessage(text, type = 'success') {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+        
+        function validateUrl(url) {
+            try {
+                new URL(url);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+        
+        function loadProxyProxyUrl() {
+            const urlInput = document.getElementById('urlInput');
+            let url = urlInput.value.trim();
+            
+            if (!url) {
+                showMessage('Please enter a URL', 'error');
+                return;
+            }
+            
+            // Auto-add protocol if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            
+            if (!validateUrl(url)) {
+                showMessage('Please enter a valid URL', 'error');
+                return;
+            }
+            
+            try {
+                // Encode URL in base64 like ProxyProxy
+                const encodedUrl = btoa(url);
+                const proxyUrl = `/api/pp?__cpo=${encodedUrl}&ko=s`;
+                
+                console.log('ProxyProxy URL:', url, '->', proxyUrl);
+                showMessage(`Opening ${url} with ProxyProxy style...`);
+                
+                // Open in new tab
+                window.open(proxyUrl, '_blank');
+                
+                // Clear input
+                setTimeout(() => {
+                    urlInput.value = '';
+                }, 2000);
+                
+            } catch (error) {
+                showMessage('Error encoding URL: ' + error.message, 'error');
+            }
+        }
+        
+        // Handle Enter key
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadProxyProxyUrl();
+            }
+        });
+        
+        // Auto-focus on page load
+        window.addEventListener('load', function() {
+            document.getElementById('urlInput').focus();
+        });
+    </script>
+</body>
+</html>

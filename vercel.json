@@ -7,6 +7,9 @@
     "api/browse.js": {
       "maxDuration": 30
     },
+    "api/pp.js": {
+      "maxDuration": 30
+    },
     "api/encode/[encoded].js": {
       "maxDuration": 30
     },
