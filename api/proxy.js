@@ -311,18 +311,18 @@ function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
   console.log(`[PROXY] Injected base tag: ${baseTag}`);
   
   // Rewrite different types of URLs with more comprehensive patterns
-  rewrittenHtml = rewrittenHtml.replace(/href\s*=\s*["']([^"']+)["']/gi, (match, url) => {
+  html = html.replace(/href\s*=\s*["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `href="${rewrittenUrl}"`;
   });
   
-  rewrittenHtml = rewrittenHtml.replace(/src\s*=\s*["']([^"']+)["']/gi, (match, url) => {
+  html = html.replace(/src\s*=\s*["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `src="${rewrittenUrl}"`;
   });
   
   // Enhanced form action rewriting with better handling for empty/relative actions
-  rewrittenHtml = rewrittenHtml.replace(/(<form[^>]*?)(?:\s+action\s*=\s*["']([^"']*)["'])?([^>]*>)/gi, (match, formStart, action, formEnd) => {
+  html = html.replace(/(<form[^>]*?)(?:\s+action\s*=\s*["']([^"']*)["'])?([^>]*>)/gi, (match, formStart, action, formEnd) => {
     let targetUrl = action;
     
     // Handle empty or missing form actions (they submit to current page)
@@ -341,24 +341,24 @@ function rewriteHtmlUrls(html, baseUrl, proxyOrigin) {
   });
   
   // Rewrite CSS @import and url() references
-  rewrittenHtml = rewrittenHtml.replace(/url\s*\(\s*["']?([^"')]+)["']?\s*\)/gi, (match, url) => {
+  html = html.replace(/url\s*\(\s*["']?([^"')]+)["']?\s*\)/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `url("${rewrittenUrl}")`;
   });
   
   // Rewrite @import statements
-  rewrittenHtml = rewrittenHtml.replace(/@import\s+["']([^"']+)["']/gi, (match, url) => {
+  html = html.replace(/@import\s+["']([^"']+)["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url, baseUrl, proxyOrigin);
     return `@import "${rewrittenUrl}"`;
   });
   
   // Rewrite meta refresh URLs
-  rewrittenHtml = rewrittenHtml.replace(/content\s*=\s*["'][^"']*url\s*=\s*([^"';]+)[^"']*["']/gi, (match, url) => {
+  html = html.replace(/content\s*=\s*["'][^"']*url\s*=\s*([^"';]+)[^"']*["']/gi, (match, url) => {
     const rewrittenUrl = rewriteUrl(url.trim(), baseUrl, proxyOrigin);
     return match.replace(url, rewrittenUrl);
   });
   
-  return rewrittenHtml;
+  return html;
 }
 
 // Function to rewrite URLs in CSS content
