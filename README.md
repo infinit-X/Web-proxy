@@ -1,20 +1,41 @@
 # Vercel Web Proxy
 
-A secure web proxy application deployed on Vercel using serverless functions. This tool allows you to access blocked websites by routing traffic through Vercel's trusted infrastructure.
+A sophisticated web proxy application deployed on Vercel using serverless functions. This tool allows you to access blocked websites with persistent navigation by routing traffic through Vercel's trusted infrastructure.
 
-## 🚀 Features
+## 🚀 Key Features
 
-- **Secure Proxying**: All traffic is routed through HTTPS-encrypted connections
-- **Corporate Network Friendly**: Uses Vercel's `*.vercel.app` domain which is typically allowed
-- **Modern Interface**: Clean, responsive web interface with quick access buttons
-- **Smart Error Handling**: Comprehensive error messages and timeout handling
-- **Security Measures**: Prevents access to internal/local networks to avoid abuse
+- **🔒 Secure Proxying**: All traffic is routed through HTTPS-encrypted connections
+- **🌐 Navigation Persistence**: Links, forms, searches, and navigation work seamlessly 
+- **📱 New Tab Experience**: URLs open in new tabs for better browsing experience
+- **🎯 Resource Loading**: Images, CSS, JavaScript, and other resources load properly
+- **⚡ URL Rewriting**: Automatic rewriting of all URLs to maintain proxy persistence
+- **🛡️ Smart Error Handling**: Comprehensive error messages and timeout handling
+- **🔧 Form Support**: POST requests, form submissions, and searches work correctly
+
+## 🌟 Advanced Capabilities
+
+### Navigation Persistence
+- All links within proxied sites automatically route through the proxy
+- Form submissions maintain proxy routing
+- JavaScript navigation and AJAX requests are intercepted
+- Relative and absolute URLs are properly rewritten
+
+### Enhanced Security
+- Blocks access to internal/local networks to prevent abuse
+- Removes problematic headers (X-Frame-Options, CSP) for compatibility
+- Sets appropriate CORS headers for security
+- Validates and sanitizes all URLs
+
+### Resource Loading
+- Images, stylesheets, and JavaScript files load correctly
+- CSS @import and url() references are rewritten
+- Background images and other resources are proxied
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: Vanilla HTML, CSS, and JavaScript
-- **Backend**: Node.js serverless functions on Vercel
-- **HTTP Client**: Axios for robust request handling
+- **Frontend**: Vanilla HTML, CSS, and JavaScript with modern UI
+- **Backend**: Node.js serverless functions on Vercel with advanced URL rewriting
+- **HTTP Client**: Axios for robust request handling with streaming support
 - **Deployment**: GitHub integration with Vercel
 
 ## 📦 Installation & Deployment

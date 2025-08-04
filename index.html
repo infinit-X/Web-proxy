@@ -102,7 +102,86 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            min-height: 600px;
+            min-height: 400px;
+        }
+
+        .instructions {
+            padding: 40px;
+            text-align: center;
+        }
+
+        .instructions h3 {
+            color: #667eea;
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+
+        .instructions p {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 20px;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 10px;
+            text-align: left;
+        }
+
+        .feature-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .feature strong {
+            color: #667eea;
+            font-size: 1rem;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .feature p {
+            color: #888;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .usage-tips {
+            background: rgba(0, 184, 148, 0.05);
+            border-left: 4px solid #00b894;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: left;
+            margin-top: 30px;
+        }
+
+        .usage-tips h4 {
+            color: #00b894;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .usage-tips ul {
+            color: #666;
+            line-height: 1.6;
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .usage-tips li {
+            margin-bottom: 8px;
         }
 
         #contentFrame {
@@ -200,6 +279,23 @@
             .proxy-interface {
                 padding: 20px 15px;
             }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .feature {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .instructions {
+                padding: 30px 20px;
+            }
+            
+            .instructions h3 {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
@@ -236,21 +332,62 @@
         </div>
 
         <div class="proxy-frame-container">
-            <iframe id="contentFrame" title="Proxied Content" 
-                    sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-top-navigation">
-                <p>Your browser doesn't support iframes. Please try a different browser.</p>
-            </iframe>
+            <div class="instructions">
+                <h3>🚀 Ready to Browse Securely</h3>
+                <p>Enter any URL above and click "Go" to open it in a new tab through our secure proxy.</p>
+                
+                <div class="features">
+                    <div class="feature">
+                        <span class="feature-icon">🔒</span>
+                        <div>
+                            <strong>HTTPS Encrypted</strong>
+                            <p>All traffic is encrypted and secure</p>
+                        </div>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">🌐</span>
+                        <div>
+                            <strong>Navigation Persistence</strong>
+                            <p>Links, forms, and searches work seamlessly</p>
+                        </div>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">⚡</span>
+                        <div>
+                            <strong>Fast & Reliable</strong>
+                            <p>Powered by Vercel's global network</p>
+                        </div>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">🎯</span>
+                        <div>
+                            <strong>Resource Loading</strong>
+                            <p>Images, CSS, and JavaScript load properly</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="usage-tips">
+                    <h4>💡 Usage Tips:</h4>
+                    <ul>
+                        <li>URLs open in new tabs for better navigation</li>
+                        <li>All links within proxied sites stay proxied</li>
+                        <li>Forms and searches work normally</li>
+                        <li>Bookmark the new tab URL for quick access</li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="footer">
         <p>⚠️ Use responsibly and in accordance with your organization's policies</p>
+        <p>🔗 URLs open in new tabs with persistent proxy navigation</p>
     </div>
 
     <script>
         const urlInput = document.getElementById('urlInput');
         const goButton = document.getElementById('goButton');
-        const contentFrame = document.getElementById('contentFrame');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const errorMessage = document.getElementById('errorMessage');
         const successMessage = document.getElementById('successMessage');
@@ -327,29 +464,24 @@
             // Construct the proxy request URL
             const proxyRequestUrl = `${PROXY_API_ENDPOINT}?url=${encodeURIComponent(url)}`;
             
-            console.log('Loading URL through proxy:', url);
+            console.log('Opening URL in new tab through proxy:', url);
             console.log('Proxy request URL:', proxyRequestUrl);
             
-            // Set iframe source to trigger the proxy request
-            contentFrame.src = proxyRequestUrl;
+            // Open in new tab instead of iframe
+            const newWindow = window.open(proxyRequestUrl, '_blank');
             
-            // Handle iframe load events
-            contentFrame.onload = function() {
+            if (newWindow) {
                 hideAllMessages();
-                showMessage('success', `Successfully loaded: ${url}`);
-            };
-            
-            contentFrame.onerror = function() {
-                showMessage('error', 'Failed to load the website. The site might be down or incompatible.');
-            };
-            
-            // Timeout handling
-            setTimeout(() => {
-                if (loadingIndicator.style.display === 'block') {
+                showMessage('success', `Opening ${url} in new tab through secure proxy...`);
+                
+                // Clear the input after successful launch
+                setTimeout(() => {
+                    urlInput.value = '';
                     hideAllMessages();
-                    showMessage('error', 'Request timed out. The website might be slow or unavailable.');
-                }
-            }, 30000); // 30 second timeout
+                }, 2000);
+            } else {
+                showMessage('error', 'Popup blocked! Please allow popups for this site and try again.');
+            }
         }
 
         function loadQuickSite(url) {
@@ -369,12 +501,6 @@
         // Focus on input when page loads
         window.addEventListener('load', () => {
             urlInput.focus();
-        });
-
-        // Handle iframe security and error cases
-        window.addEventListener('message', (event) => {
-            // Handle messages from iframe if needed
-            console.log('Received message from iframe:', event);
         });
     </script>
 </body>
