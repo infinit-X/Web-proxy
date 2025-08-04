@@ -17,10 +17,53 @@ module.exports = async (req, res) => {
   const { p: pathParam } = req.query;
   
   if (!pathParam) {
+    console.error('[BROWSE-PROXY] Missing path parameter');
+    console.error('[BROWSE-PROXY] Query params:', req.query);
+    console.error('[BROWSE-PROXY] Request URL:', req.url);
+    
+    // Check if this is a misdirected form submission
+    if (Object.keys(req.query).length > 0) {
+      const referer = req.headers.referer;
+      if (referer && referer.includes('/api/browse?p=')) {
+        try {
+          // Extract the p parameter from referer
+          const refererUrl = new URL(referer);
+          const refererPParam = refererUrl.searchParams.get('p');
+          
+          if (refererPParam) {
+            // Reconstruct the request with the p parameter from referer
+            console.log('[BROWSE-PROXY] Reconstructing request from referer:', refererPParam);
+            
+            // Parse the referer p parameter to get the base URL
+            const parts = refererPParam.split('/');
+            if (parts.length >= 2) {
+              const protocol = parts[0];
+              const domain = parts[1];
+              
+              // Build new p parameter for search request
+              const searchPath = req.url.includes('/search') ? 'search' : '';
+              const newPParam = `${protocol}/${domain}${searchPath ? '/' + searchPath : ''}`;
+              
+              // Redirect to correct URL
+              const queryString = new URLSearchParams(req.query).toString();
+              const redirectUrl = `/api/browse?p=${newPParam}&${queryString}`;
+              
+              console.log('[BROWSE-PROXY] Redirecting to:', redirectUrl);
+              return res.redirect(302, redirectUrl);
+            }
+          }
+        } catch (error) {
+          console.error('[BROWSE-PROXY] Error reconstructing from referer:', error);
+        }
+      }
+    }
+    
     return res.status(400).json({
       error: 'Missing path parameter',
       message: 'Expected format: /api/browse?p=https/domain.com/path',
-      example: '/api/browse?p=https/www.google.com/search'
+      example: '/api/browse?p=https/www.google.com/search',
+      receivedQuery: req.query,
+      requestUrl: req.url
     });
   }
 
@@ -119,7 +162,8 @@ function rewriteHtmlForBrowseProxy(html, baseUrl) {
   html = html.replace(/<base[^>]*>/gi, '');
   
   // Create base tag that points to our browse proxy
-  const baseProxyPath = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}/`;
+  const currentPath = baseUrlObj.pathname === '/' ? '' : baseUrlObj.pathname.replace(/^\//, '');
+  const baseProxyPath = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${currentPath ? '/' + currentPath : ''}`;
   const baseTag = `<base href="${baseProxyPath}" target="_blank">`;
   
   if (html.includes('<head>')) {
@@ -145,23 +189,75 @@ function rewriteHtmlForBrowseProxy(html, baseUrl) {
     return `src="${proxyOrigin}/api/browse?p=${protocol}/${domain}${cleanPath ? '/' + cleanPath : ''}"`;
   });
 
-  // Handle forms - this is the key fix for search forms
+  // Rewrite root-relative URLs (starting with /)
+  html = html.replace(/href=["']\/(?!api\/browse)([^"']*)["']/gi, (match, path) => {
+    const cleanPath = path.replace(/^\//, '');
+    return `href="${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${cleanPath ? '/' + cleanPath : ''}"`;
+  });
+
+  html = html.replace(/src=["']\/(?!api\/browse)([^"']*)["']/gi, (match, path) => {
+    const cleanPath = path.replace(/^\//, '');
+    return `src="${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${cleanPath ? '/' + cleanPath : ''}"`;
+  });
+
+  // Rewrite relative URLs (that don't start with / or http)
+  html = html.replace(/href=["'](?!https?:\/\/|\/|#|javascript:|mailto:)([^"']*)["']/gi, (match, path) => {
+    try {
+      const resolvedUrl = new URL(path, baseUrl);
+      const resolvedPath = resolvedUrl.pathname === '/' ? '' : resolvedUrl.pathname.replace(/^\//, '');
+      return `href="${proxyOrigin}/api/browse?p=${resolvedUrl.protocol.slice(0, -1)}/${resolvedUrl.host}${resolvedPath ? '/' + resolvedPath : ''}"`;
+    } catch (e) {
+      return match;
+    }
+  });
+
+  html = html.replace(/src=["'](?!https?:\/\/|\/|data:|javascript:)([^"']*)["']/gi, (match, path) => {
+    try {
+      const resolvedUrl = new URL(path, baseUrl);
+      const resolvedPath = resolvedUrl.pathname === '/' ? '' : resolvedUrl.pathname.replace(/^\//, '');
+      return `src="${proxyOrigin}/api/browse?p=${resolvedUrl.protocol.slice(0, -1)}/${resolvedUrl.host}${resolvedPath ? '/' + resolvedPath : ''}"`;
+    } catch (e) {
+      return match;
+    }
+  });
+
+  // Handle forms - CRITICAL FIX for search forms
   html = html.replace(/(<form[^>]*?)(?:\s+action\s*=\s*["']([^"']*)["'])?([^>]*>)/gi, (match, formStart, action, formEnd) => {
     let targetAction;
     
     if (!action || action === '' || action === '#') {
-      // Form submits to current page
-      targetAction = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${baseUrlObj.pathname.replace(/^\//, '') ? '/' + baseUrlObj.pathname.replace(/^\//, '') : ''}`;
+      // Form submits to current page - preserve the full path including query parameters
+      const currentUrl = new URL(baseUrl);
+      const currentPath = currentUrl.pathname === '/' ? '' : currentUrl.pathname.replace(/^\//, '');
+      
+      // For search pages, we need to make sure the form posts to the search endpoint
+      if (currentUrl.pathname.includes('/search') || currentPath.includes('search')) {
+        targetAction = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}/search`;  
+      } else {
+        targetAction = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${currentPath ? '/' + currentPath : ''}`;
+      }
     } else if (action.startsWith('/')) {
       // Root-relative URL
-      targetAction = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${action.replace(/^\//, '') ? '/' + action.replace(/^\//, '') : ''}`;
+      const cleanAction = action.replace(/^\//, '');
+      targetAction = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${cleanAction ? '/' + cleanAction : ''}`;
     } else if (action.startsWith('http')) {
-      // Already absolute, will be handled by the regex above
-      return match;
+      // Already absolute - convert to browse format
+      try {
+        const actionUrl = new URL(action);
+        const actionPath = actionUrl.pathname === '/' ? '' : actionUrl.pathname.replace(/^\//, '');
+        targetAction = `${proxyOrigin}/api/browse?p=${actionUrl.protocol.slice(0, -1)}/${actionUrl.host}${actionPath ? '/' + actionPath : ''}`;
+      } catch (e) {
+        return match;
+      }
     } else {
-      // Relative URL
-      const currentPath = baseUrlObj.pathname.split('/').slice(0, -1).join('/');
-      targetAction = `${proxyOrigin}/api/browse?p=${baseUrlObj.protocol.slice(0, -1)}/${baseUrlObj.host}${currentPath ? currentPath : ''}/${action}`;
+      // Relative URL - resolve against current page
+      try {
+        const resolvedUrl = new URL(action, baseUrl);
+        const resolvedPath = resolvedUrl.pathname === '/' ? '' : resolvedUrl.pathname.replace(/^\//, '');
+        targetAction = `${proxyOrigin}/api/browse?p=${resolvedUrl.protocol.slice(0, -1)}/${resolvedUrl.host}${resolvedPath ? '/' + resolvedPath : ''}`;
+      } catch (e) {
+        return match;
+      }
     }
     
     console.log(`[BROWSE-PROXY] Form action rewrite: "${action}" -> "${targetAction}"`);
@@ -223,11 +319,29 @@ function generateBrowseProxyScript(baseUrl, proxyOrigin) {
       const form = e.target;
       let action = form.getAttribute('action') || '';
       
+      console.log('[BROWSE-PROXY] Form submission intercepted. Action:', action);
+      
+      // If action is empty or #, use current page
       if (!action || action === '#') {
+        // Get current page path from window location
+        const currentUrl = window.location.href;
+        if (currentUrl.includes('/api/browse?p=')) {
+          // Extract the p parameter and use it as action
+          const urlParams = new URLSearchParams(window.location.search);
+          const pParam = urlParams.get('p');
+          if (pParam) {
+            action = PROXY_ORIGIN + '/api/browse?p=' + pParam;
+            form.setAttribute('action', action);
+            console.log('[BROWSE-PROXY] Set empty form action to current page:', action);
+            return; // Let form submit normally
+          }
+        }
+        // Fallback
         action = window.location.pathname + window.location.search;
       }
       
-      if (!action.includes('/api/browse')) {
+      // Only rewrite if not already a browse proxy URL
+      if (!action.includes('/api/browse?p=')) {
         const newAction = convertToBrowseProxy(action);
         form.setAttribute('action', newAction);
         console.log('[BROWSE-PROXY] Form action converted:', action, '->', newAction);
